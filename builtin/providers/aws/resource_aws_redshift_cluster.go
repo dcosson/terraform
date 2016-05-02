@@ -86,6 +86,13 @@ func resourceAwsRedshiftCluster() *schema.Resource {
 				Computed: true,
 			},
 
+                        "iam_roles": &schema.Schema{
+                            Type:     schema.TypeSet,
+                            Optional: true,
+                            Elem:     &schema.Schema{Type: schema.TypeString},
+                            Set:      schema.HashString,
+                        },
+
 			"preferred_maintenance_window": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
@@ -231,6 +238,10 @@ func resourceAwsRedshiftClusterCreate(d *schema.ResourceData, meta interface{}) 
 		createOpts.AvailabilityZone = aws.String(v.(string))
 	}
 
+	if v, ok := d.GetOk("iam_roles"); ok {
+		createOpts.IamRoles = expandStringList(v.List())
+	}
+
 	if v, ok := d.GetOk("preferred_maintenance_window"); ok {
 		createOpts.PreferredMaintenanceWindow = aws.String(v.(string))
 	}
@@ -344,6 +355,16 @@ func resourceAwsRedshiftClusterRead(d *schema.ResourceData, meta interface{}) er
 	}
 	if err := d.Set("cluster_security_groups", csg); err != nil {
 		return fmt.Errorf("[DEBUG] Error saving Cluster Security Group Names to state for Redshift Cluster (%s): %s", d.Id(), err)
+	}
+
+        var iar []string
+        for _, r := range rsc.IamRoles {
+            if *r.ApplyStatus == "in-sync" || *r.ApplyStatus == "adding" {
+                iar = append(iar, *r.IamRoleArn)
+            }
+        }
+	if err := d.Set("iam_roles", csg); err != nil {
+		return fmt.Errorf("[DEBUG] Error saving IAM Roles to state for Redshift Cluster (%s): %s", d.Id(), err)
 	}
 
 	d.Set("cluster_public_key", rsc.ClusterPublicKey)
